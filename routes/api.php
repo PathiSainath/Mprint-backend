@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\FavoriteController;
 use App\Http\Controllers\Api\BannerController;
 use App\Http\Controllers\Api\OfferBarController;
+use App\Http\Controllers\OrderController;
 
 Route::get('/health', fn() => response()->json([
   'success' => true,
@@ -83,5 +84,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/check/{productId}', [FavoriteController::class, 'check']);
     Route::get('/count', [FavoriteController::class, 'count']);
     Route::delete('/clear', [FavoriteController::class, 'clear']);
+  });
+
+  Route::prefix('orders')->group(function () {
+    Route::get('/', [OrderController::class, 'index']);
+    Route::get('/{id}', [OrderController::class, 'show']);
+    Route::post('/raise-ticket', [OrderController::class, 'raiseTicket']);
   });
 });
