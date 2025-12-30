@@ -52,6 +52,11 @@ class Order extends Model
         return $this->hasMany(OrderItem::class);
     }
 
+    public function complaints()
+    {
+        return $this->hasMany(Complaint::class);
+    }
+
     // Helper method to generate unique order number
     public static function generateOrderNumber()
     {
