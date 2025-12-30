@@ -7,6 +7,7 @@ use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\Cart;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class OrderController extends Controller
@@ -54,7 +55,7 @@ class OrderController extends Controller
         ]);
 
         try {
-            \DB::beginTransaction();
+            DB::beginTransaction();
 
             $subtotal = 0;
             $orderItems = [];
@@ -132,7 +133,7 @@ class OrderController extends Controller
             // Clear user's cart
             Cart::where('user_id', $request->user()->id)->delete();
 
-            \DB::commit();
+            DB::commit();
 
             // Load relationships for response
             $order->load(['orderItems.product.images']);
@@ -144,7 +145,7 @@ class OrderController extends Controller
             ], 201);
 
         } catch (\Exception $e) {
-            \DB::rollBack();
+            DB::rollBack();
 
             return response()->json([
                 'success' => false,
