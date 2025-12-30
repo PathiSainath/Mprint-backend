@@ -94,6 +94,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/raise-ticket', [OrderController::class, 'raiseTicket']);
   });
 
+  Route::prefix('complaints')->group(function () {
+    Route::get('/', [OrderController::class, 'getUserComplaints']);
+  });
+
   // Admin routes (TODO: Add admin authentication middleware)
   Route::prefix('admin')->group(function () {
     Route::get('/orders', [AdminController::class, 'getOrders']);

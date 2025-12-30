@@ -180,6 +180,30 @@ class OrderController extends Controller
     }
 
     /**
+     * Get all complaints for the authenticated user
+     */
+    public function getUserComplaints(Request $request)
+    {
+        try {
+            $complaints = $request->user()->complaints()
+                ->with(['order', 'product'])
+                ->orderBy('created_at', 'desc')
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => $complaints
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch complaints',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Send complaint/ticket email to admin
      */
     public function raiseTicket(Request $request)
