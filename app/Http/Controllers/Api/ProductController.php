@@ -50,6 +50,14 @@ class ProductController extends Controller
         if ($request->filled('featured')) $query->featured();
         if ($request->filled('in_stock')) $query->inStock();
 
+        // Price filtering
+        if ($request->filled('min_price')) {
+            $query->where('price', '>=', (float)$request->min_price);
+        }
+        if ($request->filled('max_price')) {
+            $query->where('price', '<=', (float)$request->max_price);
+        }
+
         if ($request->filled('search')) {
             $s = $request->search;
             $query->where(function ($q) use ($s) {
@@ -74,19 +82,46 @@ class ProductController extends Controller
     /**
      * GET /api/products/category/{slug}
      */
-    public function byCategory($categorySlug): JsonResponse
+    public function byCategory(Request $request, $categorySlug): JsonResponse
     {
         try {
             $category = Category::where('slug', $categorySlug)->firstOrFail();
 
-            $products = Product::where('category_id', $category->id)
-                ->active()
-                ->with('images')
-                ->paginate(12);
+            $query = Product::where('category_id', $category->id)->active()->with('images');
+
+            // Price filtering
+            if ($request->filled('min_price')) {
+                $query->where('price', '>=', (float)$request->min_price);
+            }
+            if ($request->filled('max_price')) {
+                $query->where('price', '<=', (float)$request->max_price);
+            }
+
+            // Sorting
+            $sortBy = $request->get('sort_by', 'created_at');
+            $sortOrder = $request->get('sort_order', 'desc');
+            $query->orderBy($sortBy, $sortOrder);
+
+            $perPage = (int)$request->get('per_page', 12);
+            $products = $query->paginate($perPage);
 
             $products->getCollection()->transform(fn($p) => $this->appendImageUrls($p));
 
-            return response()->json(['success' => true, 'data' => $products, 'category' => $category]);
+            // Get price range for this category
+            $priceRange = Product::where('category_id', $category->id)
+                ->active()
+                ->selectRaw('MIN(price) as min_price, MAX(price) as max_price')
+                ->first();
+
+            return response()->json([
+                'success' => true,
+                'data' => $products,
+                'category' => $category,
+                'price_range' => [
+                    'min' => (float)($priceRange->min_price ?? 0),
+                    'max' => (float)($priceRange->max_price ?? 10000)
+                ]
+            ]);
         } catch (\Exception $e) {
             Log::error('byCategory error: ' . $e->getMessage(), ['slug' => $categorySlug]);
             return response()->json(['success' => false, 'message' => 'Category not found or error fetching products.'], 404);
