@@ -6,6 +6,7 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\Cart;
+use App\Models\Complaint;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -209,28 +210,28 @@ class OrderController extends Controller
                 }
             }
 
-            // Prepare email data
-            $emailData = [
-                'user_name' => $request->user()->name,
-                'user_email' => $request->user()->email,
-                'order_number' => $order->order_number,
-                'transaction_id' => $order->transaction_id,
-                'invoice_id' => $order->invoice_id,
-                'product_name' => $order->orderItems->first()->product_name ?? 'N/A',
+            // Get product name from order items
+            $productName = $order->orderItems->first()->product_name ?? 'N/A';
+
+            // Save complaint to database
+            $complaint = Complaint::create([
+                'user_id' => $request->user()->id,
+                'order_id' => $validated['order_id'],
+                'product_id' => $validated['product_id'],
+                'product_name' => $productName,
                 'issue_type' => $validated['issue_type'],
                 'description' => $validated['description'],
-                'image_paths' => $imagePaths,
-                'submitted_at' => now()->format('Y-m-d H:i:s'),
-            ];
+                'images' => $imagePaths,
+                'status' => 'pending',
+            ]);
 
             // TODO: Send email to admin using Resend service
-            // For now, we'll just return success
-            // \Mail::to(config('mail.admin_email'))->send(new ComplaintMail($emailData));
+            // \Mail::to(config('mail.admin_email'))->send(new ComplaintMail($complaint));
 
             return response()->json([
                 'success' => true,
                 'message' => 'Your complaint has been submitted successfully. Our team will review it shortly.',
-                'data' => $emailData
+                'data' => $complaint->load(['user', 'order', 'product'])
             ]);
         } catch (\Exception $e) {
             return response()->json([

@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\FavoriteController;
 use App\Http\Controllers\Api\BannerController;
 use App\Http\Controllers\Api\OfferBarController;
+use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\OrderController;
 
 Route::get('/health', fn() => response()->json([
@@ -91,5 +92,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/', [OrderController::class, 'store']);
     Route::get('/{id}', [OrderController::class, 'show']);
     Route::post('/raise-ticket', [OrderController::class, 'raiseTicket']);
+  });
+
+  // Admin routes (TODO: Add admin authentication middleware)
+  Route::prefix('admin')->group(function () {
+    Route::get('/orders', [AdminController::class, 'getOrders']);
+    Route::get('/complaints', [AdminController::class, 'getComplaints']);
+    Route::get('/stats', [AdminController::class, 'getDashboardStats']);
+    Route::put('/orders/{id}/status', [AdminController::class, 'updateOrderStatus']);
+    Route::put('/complaints/{id}/status', [AdminController::class, 'updateComplaintStatus']);
   });
 });
