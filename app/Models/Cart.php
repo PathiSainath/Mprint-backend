@@ -1,5 +1,5 @@
 <?php
-// ...existing code...
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -17,6 +17,8 @@ class Cart extends Model
         'product_id',
         'quantity',
         'selected_attributes',
+        'front_design_path',
+        'back_design_path',
         'unit_price',
         'total_price',
     ];
@@ -28,9 +30,20 @@ class Cart extends Model
         'quantity' => 'integer',
     ];
 
+    protected $appends = ['front_design_url', 'back_design_url'];
+
     public function product()
     {
         return $this->belongsTo(\App\Models\Product::class);
     }
+
+    public function getFrontDesignUrlAttribute()
+    {
+        return $this->front_design_path ? asset('storage/' . $this->front_design_path) : null;
+    }
+
+    public function getBackDesignUrlAttribute()
+    {
+        return $this->back_design_path ? asset('storage/' . $this->back_design_path) : null;
+    }
 }
-// ...existing code...

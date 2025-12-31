@@ -9,6 +9,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Intervention\Image\Laravel\Facades\Image;
 
 class CartController extends Controller
 {
@@ -45,6 +48,8 @@ class CartController extends Controller
                 ],
                 'quantity' => $item->quantity,
                 'selected_attributes' => $item->selected_attributes ?? [],
+                'front_design_url' => $item->front_design_url,
+                'back_design_url' => $item->back_design_url,
                 'unit_price' => $item->unit_price,
                 'total_price' => $item->total_price,
             ]);
@@ -163,5 +168,124 @@ class CartController extends Controller
         $userId = auth()->id();
         $total = Cart::where('user_id', $userId)->sum('total_price');
         return response()->json(['success' => true, 'total' => $total]);
+    }
+
+    // POST /api/cart/{cartId}/upload-designs (auth required)
+    public function uploadDesigns(Request $request, $cartId)
+    {
+        $validator = Validator::make($request->all(), [
+            'front_design' => 'nullable|image|mimes:jpeg,jpg,png,webp|max:10240', // 10MB
+            'back_design' => 'nullable|image|mimes:jpeg,jpg,png,webp|max:10240',
+        ], [
+            'front_design.image' => 'Front design must be a valid image.',
+            'front_design.mimes' => 'Front design must be JPG, PNG, or WebP.',
+            'front_design.max' => 'Front design must not exceed 10MB.',
+            'back_design.image' => 'Back design must be a valid image.',
+            'back_design.mimes' => 'Back design must be JPG, PNG, or WebP.',
+            'back_design.max' => 'Back design must not exceed 10MB.',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+        }
+
+        try {
+            $userId = auth()->id();
+            $cart = Cart::where('user_id', $userId)->findOrFail($cartId);
+
+            $frontPath = $cart->front_design_path;
+            $backPath = $cart->back_design_path;
+
+            // Handle front design upload
+            if ($request->hasFile('front_design')) {
+                // Delete old front design if exists
+                if ($frontPath) {
+                    Storage::disk('public')->delete($frontPath);
+                }
+
+                $frontPath = $this->processDesignUpload($request->file('front_design'), 'front');
+            }
+
+            // Handle back design upload
+            if ($request->hasFile('back_design')) {
+                // Delete old back design if exists
+                if ($backPath) {
+                    Storage::disk('public')->delete($backPath);
+                }
+
+                $backPath = $this->processDesignUpload($request->file('back_design'), 'back');
+            }
+
+            $cart->update([
+                'front_design_path' => $frontPath,
+                'back_design_path' => $backPath,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Designs uploaded successfully',
+                'data' => [
+                    'front_design_url' => $cart->fresh()->front_design_url,
+                    'back_design_url' => $cart->fresh()->back_design_url,
+                ]
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Cart#uploadDesigns failed', ['e' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+            return response()->json(['success' => false, 'message' => 'Failed to upload designs'], 500);
+        }
+    }
+
+    // DELETE /api/cart/{cartId}/designs/{side} (auth required)
+    public function deleteDesign(Request $request, $cartId, $side)
+    {
+        if (!in_array($side, ['front', 'back'])) {
+            return response()->json(['success' => false, 'message' => 'Invalid design side'], 400);
+        }
+
+        try {
+            $userId = auth()->id();
+            $cart = Cart::where('user_id', $userId)->findOrFail($cartId);
+
+            $pathField = $side . '_design_path';
+            $currentPath = $cart->{$pathField};
+
+            if ($currentPath) {
+                Storage::disk('public')->delete($currentPath);
+                $cart->update([$pathField => null]);
+            }
+
+            return response()->json(['success' => true, 'message' => ucfirst($side) . ' design deleted']);
+        } catch (\Exception $e) {
+            Log::error('Cart#deleteDesign failed', ['e' => $e->getMessage()]);
+            return response()->json(['success' => false, 'message' => 'Failed to delete design'], 500);
+        }
+    }
+
+    // Helper method to process and save design uploads
+    private function processDesignUpload($file, $side)
+    {
+        try {
+            $img = Image::read($file);
+
+            // Scale down if too large, maintaining aspect ratio
+            $img = $img->scaleDown(2000);
+
+            $filename = $side . '_' . time() . '_' . Str::random(8) . '.jpg';
+            $relative = 'cart-designs/' . $filename;
+            $absolute = storage_path('app/public/' . $relative);
+
+            // Ensure directory exists
+            if (!is_dir(dirname($absolute))) {
+                mkdir(dirname($absolute), 0755, true);
+            }
+
+            // Save as JPEG quality 85
+            $img->toJpeg(85)->save($absolute);
+
+            return $relative;
+        } catch (\Exception $e) {
+            Log::error('processDesignUpload failed', ['e' => $e->getMessage()]);
+            throw $e;
+        }
     }
 }

@@ -204,6 +204,46 @@ class ProductController extends Controller
     }
 
     /**
+     * GET /api/products/{slug}/related
+     * Returns products from the same category, excluding the current product
+     */
+    public function relatedProducts(Request $request, $slug): JsonResponse
+    {
+        try {
+            $product = Product::where('slug', $slug)->with('category')->first();
+
+            if (!$product) {
+                return response()->json(['success' => false, 'message' => 'Product not found'], 404);
+            }
+
+            $limit = (int)$request->get('limit', 8);
+
+            $relatedProducts = Product::where('category_id', $product->category_id)
+                ->where('id', '!=', $product->id)
+                ->active()
+                ->with(['category', 'images'])
+                ->orderByRaw('RAND()')
+                ->limit($limit)
+                ->get();
+
+            $relatedProducts->transform(fn($p) => $this->appendImageUrls($p));
+
+            return response()->json([
+                'success' => true,
+                'data' => $relatedProducts,
+                'category' => $product->category,
+                'message' => 'Related products fetched successfully'
+            ]);
+        } catch (\Exception $e) {
+            Log::error('relatedProducts error: ' . $e->getMessage(), ['slug' => $slug, 'trace' => $e->getTraceAsString()]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Error fetching related products.'
+            ], 500);
+        }
+    }
+
+    /**
      * POST /api/products
      */
     public function store(Request $request): JsonResponse

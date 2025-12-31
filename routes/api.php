@@ -75,6 +75,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/clear', [CartController::class, 'clearCart']);
     Route::get('/count', [CartController::class, 'getCartCount']);
     Route::get('/total', [CartController::class, 'getCartTotal']);
+    Route::post('/{cartId}/upload-designs', [CartController::class, 'uploadDesigns']);
+    Route::delete('/{cartId}/designs/{side}', [CartController::class, 'deleteDesign']);
   });
 
   Route::prefix('favorites')->group(function () {
